@@ -13,7 +13,7 @@ from tianshou.utils import TensorboardLogger
 
 sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
 from env import make_env
-from policy import GreedyPolicy
+from policy import LLMPolicy
 
 
 def get_args():
@@ -48,14 +48,14 @@ def main(args=get_args()):
     torch.manual_seed(args.seed)
     env.seed(args.seed)
 
-    def greedy_act_func(env):
+    def get_all_available_resources_func(env):
         def _get_act():
             return env.swarm_manager.get_llm_decision
         return _get_act
 
     # policy
-    policy = GreedyPolicy(
-        greedy_act_func(env),
+    policy = LLMPolicy(
+        get_all_available_resources_func(env),
         torch.distributions.Categorical,
         action_space=env.action_space,
         action_scaling=False,
@@ -70,7 +70,7 @@ def main(args=get_args()):
     time_now = datetime.now().strftime('%b%d-%H%M%S')
     root = path.dirname(path.dirname(path.abspath(__file__)))
     log_path = os.path.join(
-        root, args.logdir, args.log_prefix, args.task, 'crashavoid', time_now)
+        root, args.logdir, args.log_prefix, args.task, 'llms', time_now)
     writer = SummaryWriter(log_path)
     writer.add_text("args", str(args))
     logger = TensorboardLogger(writer)
@@ -95,8 +95,8 @@ def main(args=get_args()):
     if __name__ == '__main__':
         np.random.seed(args.seed)
         env, _, _ = make_env(args.task)
-        policy = GreedyPolicy(
-            greedy_act_func(env),
+        policy = LLMPolicy(
+            get_all_available_resources_func(env),
             torch.distributions.Categorical,
             action_space=env.action_space,
             action_scaling=False,

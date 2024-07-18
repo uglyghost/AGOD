@@ -4,6 +4,23 @@ from .user import User
 from .service_provider import ServiceProvider
 from .task import TaskGenerator
 from .config import *
+from openai import OpenAI
+import re
+import random
+
+# Set environment variables for API access
+os.environ["OPENAI_API_KEY"] = "sk-AipKjBYHdd39JagE4052B9FeCa694389921635Ef23993aD7"
+os.environ["OPENAI_API_BASE"] = "https://api.rcouyi.com/v1/"
+
+os.environ["OPENAI_API_KEY"] = "none"
+os.environ["OPENAI_API_BASE"] = "http://10.220.138.111:8001/v1/"
+
+# 初始化 OpenAI 客户端
+client = OpenAI(
+    # This is the default and can be omitted
+    api_key=os.environ.get("OPENAI_API_KEY"),
+    base_url=os.environ.get("OPENAI_API_BASE"),
+)
 
 
 class SwarmManager:
@@ -83,6 +100,39 @@ class SwarmManager:
     def most_availble_service_provider(self):
         return np.argmax([service_provider.available_t
                           for service_provider in self._service_providers])
+
+    @property
+    def get_llm_decision(self):
+        available_resources = [service_provider.available_t for service_provider in self._service_providers]
+        total_resources = [service_provider.total_t for service_provider in self._service_providers]
+        SP_idx = self.model_decision(available_resources, total_resources)
+        return SP_idx
+
+    def model_decision(self, available_resources, total_resources) -> int:
+        prompt = "Here is the available and total resource information for each server:\n\n"
+        for idx, resource in enumerate(available_resources):
+            prompt += f"Server {idx}: Available resources = {resource}, Total resources = {total_resources[idx]}\n"
+        prompt += ("Please choose the most suitable server ID to execute the task based on the information above. "
+                   "You should only return the server ID without any analysis or explanation.")
+
+        response = client.chat.completions.create(
+            # model="gpt-4o",
+            # model="gpt-3.5-turbo",
+            model="Qwen1.5-34B-Chat",
+            messages=[{"role": "user", "content": prompt}],
+            stream=False,
+            top_p=0.7,
+            temperature=0.1
+        )
+
+        generated_content = response.choices[0].message.content       # GPT-3.5
+        numbers = re.findall(r'\d+', generated_content)
+        if numbers:
+            server_id = int(numbers[-1])
+            if 0 <= server_id <= 19:
+                return server_id
+
+        return random.randint(0, 19)
 
     @property
     def best_reward_service_provider(self):
